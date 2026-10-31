@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <base href="https://cdn.jsdelivr.net/gh/web-ports/20-minutes@main/">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=yes">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>20 Minutes Till Dawn Mobile</title>
+    <link rel="shortcut icon" href="TemplateData/favicon.ico">
+    <link rel="stylesheet" href="TemplateData/style.css">
+    
+    <style>
+      html, body {
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: #000 !important;
+        touch-action: none !important;
+        user-select: none !important;
+        -webkit-user-select: none !important;
+      }
+
+      #unity-container {
+        width: 100vw !important;
+        height: 100vh !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+      }
+
+      #unity-canvas {
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+      }
+
+      #loading-text {
+        font-weight: bold;
+        background: linear-gradient(270deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #8f00ff);
+        background-size: 400% 400%;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: rainbow 3s ease infinite;
+      }
+
+      @keyframes rainbow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      #fs-btn {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        z-index: 2147483647;
+        background: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        border: 2px solid rgba(255, 255, 255, 0.6);
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 13px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      /* ================= TWIN-STICK UI ================= */
+      #touch-layer {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 100000;
+      }
+
+      /* Base Joystick Rings */
+      .joystick-base {
+        pointer-events: auto;
+        position: absolute;
+        width: 140px;
+        height: 140px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.08);
+        border: 2px dashed rgba(255, 255, 255, 0.35);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        backdrop-filter: blur(2px);
+      }
+
+      /* Movable Inner Nubs */
+      .joystick-knob {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        position: absolute;
+        pointer-events: none;
+        box-shadow: 0 0 12px rgba(0,0,0,0.5);
+      }
+
+      /* Left Stick (Move) */
+      #move-stick { bottom: 40px; left: 40px; }
+      #move-knob { background: rgba(255, 255, 255, 0.5); border: 2px solid #fff; }
+
+      /* Right Stick (Aim & Fire) */
+      #aim-stick {
+        bottom: 40px;
+        right: 40px;
+        border: 2px dashed rgba(255, 50, 50, 0.5);
+        background: rgba(255, 50, 50, 0.08);
+      }
+      #aim-knob {
+        background: rgba(255, 60, 60, 0.65);
+        border: 2px solid #ff5566;
+        box-shadow: 0 0 15px rgba(255, 50, 50, 0.7);
+      }
+
+      /* Reload Button */
+      #btn-reload {
+        pointer-events: auto;
+        position: absolute;
+        bottom: 195px;
+        right: 75px;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: rgba(255, 190, 0, 0.35);
+        border: 2px solid rgba(255, 220, 0, 0.8);
+        color: #fff;
+        font-weight: bold;
+        font-family: sans-serif;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 10px rgba(255, 200, 0, 0.4);
+      }
+      #btn-reload:active { transform: scale(0.9); background: rgba(255, 220, 0, 0.7); }
+    </style>
+  </head>
+  <body>
+    <button id="fs-btn">⛶ FULLSCREEN</button>
+
+    <div id="loading-text" style="color: white; font-size: 32px; font-family: cursive; text-align: center; margin-top: 20px;">
+      LOADING...
+    </div>
+
+    <div id="unity-container">
+      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
+      
+      <div id="unity-loading-bar">
+        <div id="unity-logo"></div>
+        <div id="unity-progress-bar-empty">
+          <div id="unity-progress-bar-full"></div>
+        </div>
+      </div>
+      <div id="unity-warning"></div>
+
+      <!-- TWIN-STICK TOUCH OVERLAY -->
+      <div id="touch-layer">
+        <!-- LEFT: Movement Joystick -->
+        <div class="joystick-base" id="move-stick">
+          <div class="joystick-knob" id="move-knob"></div>
+        </div>
+
+        <!-- RIGHT: Aim & Fire Joystick -->
+        <div class="joystick-base" id="aim-stick">
+          <div class="joystick-knob" id="aim-knob"></div>
+        </div>
+
+        <!-- RELOAD BUTTON -->
+        <div id="btn-reload">RELOAD</div>
+      </div>
+    </div>
+
+    <script>
+      var loadingText = document.querySelector("#loading-text");
+      let totalBytes = 0;
+      let loadedBytes = 0;
+
+      async function fetchWithProgress(url) {
+        const response = await fetch(url);
+        const reader = response.body.getReader();
+        let chunks = [];
+        let received = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          received += value.length;
+          loadedBytes += value.length;
+          chunks.push(value);
+          let mbDone = (loadedBytes / (1024 * 1024)).toFixed(2);
+          let mbTotal = '48.02';
+          loadingText.textContent = `LOADING... ${mbDone} MB / ${mbTotal} MB`;
+        }
+        let fullBuffer = new Uint8Array(received);
+        let offset = 0;
+        for (let chunk of chunks) {
+          fullBuffer.set(chunk, offset);
+          offset += chunk.length;
+        }
+        return fullBuffer.buffer;
+      }
+
+      async function mergeFiles(fileParts, cacheKey) {
+        const cache = await caches.open("20mins-cache");
+        const cachedResponse = await cache.match(cacheKey);
+        if (cachedResponse) {
+          const blob = await cachedResponse.blob();
+          return URL.createObjectURL(blob);
+        }
+        const buffers = await Promise.all(
+          fileParts.map(part => fetchWithProgress(part))
+        );
+        const mergedBlob = new Blob(buffers);
+        const response = new Response(mergedBlob);
+        await cache.put(cacheKey, response);
+        return URL.createObjectURL(mergedBlob);
+      }
+
+      function getParts(file, start, end) {
+        let parts = [];
+        for (let i = start; i <= end; i++) {
+          parts.push(file + ".part" + i);
+        }
+        return parts;
+      }
+
+      (async () => {
+        const [dataUrl, wasmUrl] = await Promise.all([
+          mergeFiles(getParts("Build/20minutes.data", 1, 2), "20minutes.data"),
+          mergeFiles(getParts("Build/20minutes.wasm", 1, 2), "20minutes.wasm"),
+        ]);
+        var container = document.querySelector("#unity-container");
+        var canvas = document.querySelector("#unity-canvas");
+        var loadingBar = document.querySelector("#unity-loading-bar");
+        var progressBarFull = document.querySelector("#unity-progress-bar-full");
+
+        var buildUrl = "Build";
+        var loaderUrl = buildUrl + "/20minutes.loader.js";
+        var config = {
+          arguments: [],
+          dataUrl: dataUrl,
+          frameworkUrl: buildUrl + "/20minutes.framework.js",
+          codeUrl: wasmUrl,
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: "Flanne",
+          productName: "MinutesTillDawn",
+          productVersion: "0.6.6",
+          showBanner: function() {},
+        };
+
+        loadingBar.style.display = "block";
+
+        var script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onload = () => {
+          createUnityInstance(canvas, config, (progress) => {
+            progressBarFull.style.width = 100 * progress + "%";
+          }).then((unityInstance) => {
+            loadingBar.style.display = "none";
+            loadingText.remove();
+          }).catch((message) => {
+            alert(message);
+          });
+        };
+        document.body.appendChild(script);
+      })();
+
+      // Fullscreen & Orientation Lock
+      const fsBtn = document.getElementById('fs-btn');
+      fsBtn.addEventListener('click', async () => {
+        const container = document.getElementById('unity-container');
+        try {
+          if (container.requestFullscreen) {
+            await container.requestFullscreen();
+          } else if (container.webkitRequestFullscreen) {
+            await container.webkitRequestFullscreen();
+          }
+        } catch(e) {}
+
+        try {
+          if (screen.orientation && screen.orientation.lock) {
+            await screen.orientation.lock('landscape');
+          }
+        } catch(e) {}
+      });
+
+      const canvas = document.querySelector('#unity-canvas');
+
+      // KEYBOARD DISPATCHER FOR WASD + R
+      const keysState = { KeyW: false, KeyA: false, KeyS: false, KeyD: false };
+      const keyCodes = { KeyW: 87, KeyA: 65, KeyS: 83, KeyD: 68, KeyR: 82 };
+
+      function setKey(code, isPressed) {
+        if (keysState[code] === isPressed) return;
+        keysState[code] = isPressed;
+        const keyChar = code.replace('Key', '').toLowerCase();
+        const event = new KeyboardEvent(isPressed ? 'keydown' : 'keyup', {
+          key: keyChar,
+          code: code,
+          keyCode: keyCodes[code],
+          which: keyCodes[code],
+          bubbles: true,
+          cancelable: true
+        });
+        window.dispatchEvent(event);
+        document.dispatchEvent(event);
+        if (canvas) canvas.dispatchEvent(event);
+      }
+
+      // RELOAD BUTTON LISTENER
+      const reloadBtn = document.getElementById('btn-reload');
+      reloadBtn.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        const evt = new KeyboardEvent('keydown', { key: 'r', code: 'KeyR', keyCode: 82, which: 82, bubbles: true });
+        window.dispatchEvent(evt);
+        if (canvas) canvas.dispatchEvent(evt);
+      }, { passive: false });
+
+      reloadBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        const evt = new KeyboardEvent('keyup', { key: 'r', code: 'KeyR', keyCode: 82, which: 82, bubbles: true });
+        window.dispatchEvent(evt);
+        if (canvas) canvas.dispatchEvent(evt);
+      }, { passive: false });
+
+
+      // ================= LEFT JOYSTICK: 8-WAY ANALOG MOVEMENT =================
+      const moveStick = document.getElementById('move-stick');
+      const moveKnob = document.getElementById('move-knob');
+      let moveTouchId = null;
+      const MAX_RADIUS = 40;
+
+      function handleMoveJoystick(touchX, touchY) {
+        const rect = moveStick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > MAX_RADIUS) {
+          dx = (dx / dist) * MAX_RADIUS;
+          dy = (dy / dist) * MAX_RADIUS;
+        }
+
+        moveKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+
+        // Deadzone threshold
+        const DEADZONE = 12;
+        setKey('KeyW', dy < -DEADZONE);
+        setKey('KeyS', dy > DEADZONE);
+        setKey('KeyA', dx < -DEADZONE);
+        setKey('KeyD', dx > DEADZONE);
+      }
+
+      function resetMoveJoystick() {
+        moveTouchId = null;
+        moveKnob.style.transform = `translate(0px, 0px)`;
+        setKey('KeyW', false);
+        setKey('KeyS', false);
+        setKey('KeyA', false);
+        setKey('KeyD', false);
+      }
+
+      moveStick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (moveTouchId === null) {
+          const touch = e.changedTouches[0];
+          moveTouchId = touch.identifier;
+          handleMoveJoystick(touch.clientX, touch.clientY);
+        }
+      }, { passive: false });
+
+
+      // ================= RIGHT JOYSTICK: 360° AIM & AUTO-FIRE =================
+      const aimStick = document.getElementById('aim-stick');
+      const aimKnob = document.getElementById('aim-knob');
+      let aimTouchId = null;
+      let aimInterval = null;
+      let currentAimX = window.innerWidth / 2 + 250;
+      let currentAimY = window.innerHeight / 2;
+
+      function sendMouse(type, x, y, isDown) {
+        const eventInit = {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+          screenX: x,
+          screenY: y,
+          button: 0,
+          buttons: isDown ? 1 : 0,
+          which: isDown ? 1 : 0
+        };
+        if (window.PointerEvent) {
+          canvas.dispatchEvent(new PointerEvent(type.replace('mouse', 'pointer'), eventInit));
+        }
+        canvas.dispatchEvent(new MouseEvent(type, eventInit));
+      }
+
+      function handleAimJoystick(touchX, touchY) {
+        const rect = aimStick.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > MAX_RADIUS) {
+          dx = (dx / dist) * MAX_RADIUS;
+          dy = (dy / dist) * MAX_RADIUS;
+        }
+
+        aimKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+
+        // Calculate 360-degree angle from joystick
+        const angle = Math.atan2(dy, dx);
+        
+        // Project aim coordinate 350px outwards from the screen center (player character)
+        const playerCenterX = window.innerWidth / 2;
+        const playerCenterY = window.innerHeight / 2;
+        currentAimX = playerCenterX + Math.cos(angle) * 350;
+        currentAimY = playerCenterY + Math.sin(angle) * 350;
+
+        sendMouse('mousemove', currentAimX, currentAimY, true);
+      }
+
+      function startFiring() {
+        sendMouse('mousedown', currentAimX, currentAimY, true);
+        if (!aimInterval) {
+          aimInterval = setInterval(() => {
+            sendMouse('mousemove', currentAimX, currentAimY, true);
+          }, 50);
+        }
+      }
+
+      function stopFiring() {
+        if (aimInterval) {
+          clearInterval(aimInterval);
+          aimInterval = null;
+        }
+        aimTouchId = null;
+        aimKnob.style.transform = `translate(0px, 0px)`;
+        sendMouse('mouseup', currentAimX, currentAimY, false);
+      }
+
+      aimStick.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        if (aimTouchId === null) {
+          const touch = e.changedTouches[0];
+          aimTouchId = touch.identifier;
+          handleAimJoystick(touch.clientX, touch.clientY);
+          startFiring();
+        }
+      }, { passive: false });
+
+
+      // ================= MULTI-TOUCH GLOBAL TRACKER =================
+      window.addEventListener('touchmove', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          if (touch.identifier === moveTouchId) {
+            handleMoveJoystick(touch.clientX, touch.clientY);
+          } else if (touch.identifier === aimTouchId) {
+            handleAimJoystick(touch.clientX, touch.clientY);
+          }
+        }
+      }, { passive: false });
+
+      window.addEventListener('touchend', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          if (touch.identifier === moveTouchId) {
+            resetMoveJoystick();
+          } else if (touch.identifier === aimTouchId) {
+            stopFiring();
+          }
+        }
+      });
+
+      window.addEventListener('touchcancel', (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+          const touch = e.changedTouches[i];
+          if (touch.identifier === moveTouchId) {
+            resetMoveJoystick();
+          } else if (touch.identifier === aimTouchId) {
+            stopFiring();
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
